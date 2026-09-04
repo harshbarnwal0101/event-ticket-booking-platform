@@ -32,8 +32,31 @@ export class SeatService {
     await Seat.insertMany(seats);
   }
 
+  async releaseExpiredSeatHolds(eventId?: string): Promise<number> {
+    const now = new Date();
+    const filter: any = {
+      status: SeatStatus.HELD,
+      holdUntil: { $lte: now },
+    };
+
+    if (eventId) {
+      filter.eventId = new Types.ObjectId(eventId);
+    }
+
+    const result = await Seat.updateMany(filter, {
+      $set: {
+        status: SeatStatus.AVAILABLE,
+        holdUntil: null,
+        ticketTypeId: null,
+      },
+    });
+
+    return result.modifiedCount || 0;
+  }
+
   async listSeats(eventId: string): Promise<any[]> {
     await this.ensureSeatMap(eventId);
+    await this.releaseExpiredSeatHolds(eventId);
 
     return await Seat.find({ eventId: new Types.ObjectId(eventId) }).sort({ row: 1, number: 1 });
   }

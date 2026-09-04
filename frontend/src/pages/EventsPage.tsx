@@ -47,6 +47,7 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [myBookings, setMyBookings] = useState<any[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [bookingForm, setBookingForm] = useState({
     customerName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : '',
@@ -56,7 +57,32 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
 
   useEffect(() => {
     fetchEvents();
-  }, [search]);
+    if (user?.role === 'CUSTOMER') {
+      fetchMyBookings();
+    }
+  }, [search, user?.role]);
+
+  const fetchMyBookings = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/bookings/my-bookings', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setMyBookings(data.data.bookings || []);
+      }
+    } catch {
+      setMyBookings([]);
+    }
+  };
 
   useEffect(() => {
     const liveSocket = io('http://localhost:5000', {
@@ -170,7 +196,43 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch('http://localhost:5000/api/bookings', {
+
+      const paymentResponse = await fetch('http://localhost:5000/api/payments/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          amount: seatTotal,
+          paymentMethod: bookingForm.paymentMethod,
+        }),
+      });
+
+      const paymentData = await paymentResponse.json();
+      if (!paymentResponse.ok || !paymentData.success) {
+        throw new Error(paymentData.message || 'Payment order creation failed');
+      }
+
+      const order = paymentData.data?.order;
+      const verificationResponse = await fetch('http://localhost:5000/api/payments/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId: order.orderId,
+          transactionId: order.transactionId,
+        }),
+      });
+
+      const verificationData = await verificationResponse.json();
+      if (!verificationResponse.ok || !verificationData.success) {
+        throw new Error(verificationData.message || 'Payment verification failed');
+      }
+
+      const bookingResponse = await fetch('http://localhost:5000/api/bookings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,17 +246,17 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
         }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Booking failed');
+      const bookingData = await bookingResponse.json();
+      if (!bookingResponse.ok || !bookingData.success) {
+        throw new Error(bookingData.message || 'Booking failed');
       }
 
-      const bookingReference = data.data?.booking?.bookingReference || 'BK-UNKNOWN';
+      const bookingReference = bookingData.data?.booking?.bookingReference || 'BK-UNKNOWN';
       alert(
-        `Booking confirmed for ${bookingForm.customerName || 'Guest'}! Reference: ${bookingReference}. Total: ₹${seatTotal}.`
+        `Payment verified and booking confirmed for ${bookingForm.customerName || 'Guest'}! Reference: ${bookingReference}. Total: ₹${seatTotal}.`
       );
 
+      await fetchMyBookings();
       setCheckoutOpen(false);
       setSelectedEvent(null);
       setSelectedSeatIds([]);
@@ -262,6 +324,30 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
                 <button className="view-btn">View Details</button>
               </div>
             ))}
+          </div>
+        )}
+
+        {user?.role === 'CUSTOMER' && (
+          <div className="bookings-panel">
+            <h3>My bookings</h3>
+            {myBookings.length === 0 ? (
+              <p className="no-bookings">No bookings yet. Pick an event and confirm a ticket to get started.</p>
+            ) : (
+              <div className="bookings-list">
+                {myBookings.map((booking) => (
+                  <div key={booking._id} className="booking-row">
+                    <div>
+                      <strong>{booking.eventId?.title || 'Event'}</strong>
+                      <p>{booking.seatLabels?.join(', ') || 'Seat selection'}</p>
+                    </div>
+                    <div className="booking-meta">
+                      <span>{booking.bookingReference}</span>
+                      <strong>₹{booking.totalAmount}</strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -415,7 +501,7 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
                         Cancel
                       </button>
                       <button type="submit" className="book-btn checkout-submit" disabled={bookingSubmitting}>
-                        {bookingSubmitting ? 'Confirming...' : 'Confirm booking'}
+                        {bookingSubmitting ? 'Processing payment...' : 'Confirm booking'}
                       </button>
                     </div>
                   </form>

@@ -90,6 +90,7 @@ export class BookingService {
         $set: {
           status: SeatStatus.BOOKED,
           ticketTypeId: new Types.ObjectId(ticketTypeId),
+          holdUntil: null,
         },
       }
     );

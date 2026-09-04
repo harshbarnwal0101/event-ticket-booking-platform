@@ -11,6 +11,7 @@ import eventRoutes from '../modules/events/routes/event.routes';
 import venueRoutes from '../modules/events/routes/venue.routes';
 import seatRoutes from '../modules/seats/routes/seat.routes';
 import bookingRoutes from '../modules/bookings/routes/booking.routes';
+import paymentRoutes from '../modules/payments/routes/payment.routes';
 
 export const createApp = (): {
   app: Express;
@@ -70,6 +71,7 @@ export const createApp = (): {
   app.use('/api/venues', venueRoutes);
   app.use('/api/seats', seatRoutes);
   app.use('/api/bookings', bookingRoutes);
+  app.use('/api/payments', paymentRoutes);
 
   // Health check endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
