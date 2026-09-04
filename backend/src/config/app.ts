@@ -1,10 +1,14 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { getRedisClient } from './redis';
+import authRoutes from '../modules/auth/routes/auth.routes';
+import eventRoutes from '../modules/events/routes/event.routes';
+import venueRoutes from '../modules/events/routes/venue.routes';
 
 export const createApp = (): {
   app: Express;
@@ -26,6 +30,7 @@ export const createApp = (): {
   app.use(cors(corsOptions));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
+  app.use(cookieParser());
 
   // Request ID middleware for logging/tracing
   app.use((_req: Request, res: Response, next: NextFunction) => {
@@ -35,15 +40,30 @@ export const createApp = (): {
     next();
   });
 
-  // Socket.IO setup with Redis adapter for scaling
-  const io = new SocketIOServer(httpServer, {
+  // Socket.IO setup with Redis adapter for scaling (optional for dev)
+  const ioOptions: any = {
     cors: corsOptions,
-    adapter: createAdapter(getRedisClient() as any, getRedisClient().duplicate() as any),
-  });
+  };
+
+  const redisClient = getRedisClient();
+  if (redisClient) {
+    ioOptions.adapter = createAdapter(redisClient as any, redisClient.duplicate() as any);
+  }
+
+  const io = new SocketIOServer(httpServer, ioOptions);
+
+  // Routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/events', eventRoutes);
+  app.use('/api/venues', venueRoutes);
 
   // Health check endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      redis: redisClient ? 'connected' : 'disconnected'
+    });
   });
 
   // Root endpoint
