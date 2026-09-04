@@ -9,6 +9,8 @@ import { getRedisClient } from './redis';
 import authRoutes from '../modules/auth/routes/auth.routes';
 import eventRoutes from '../modules/events/routes/event.routes';
 import venueRoutes from '../modules/events/routes/venue.routes';
+import seatRoutes from '../modules/seats/routes/seat.routes';
+import bookingRoutes from '../modules/bookings/routes/booking.routes';
 
 export const createApp = (): {
   app: Express;
@@ -52,10 +54,22 @@ export const createApp = (): {
 
   const io = new SocketIOServer(httpServer, ioOptions);
 
+  io.on('connection', (socket) => {
+    socket.on('event:join', (eventId: string) => {
+      if (eventId) {
+        socket.join(`event:${eventId}`);
+      }
+    });
+  });
+
+  app.locals.io = io;
+
   // Routes
   app.use('/api/auth', authRoutes);
   app.use('/api/events', eventRoutes);
   app.use('/api/venues', venueRoutes);
+  app.use('/api/seats', seatRoutes);
+  app.use('/api/bookings', bookingRoutes);
 
   // Health check endpoint
   app.get('/api/health', (_req: Request, res: Response) => {

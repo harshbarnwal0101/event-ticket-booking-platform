@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import eventController from '../controllers/event.controller';
+import ticketTypeController from '../../tickets/controllers/ticket-type.controller';
+import seatController from '../../seats/controllers/seat.controller';
 import { authenticateToken, isOrganizer } from '../../auth/middleware/auth.middleware';
 
 const router = Router();
@@ -24,6 +26,16 @@ router.post('/:id/publish', authenticateToken, isOrganizer, (req, res) =>
 router.post('/:id/cancel', authenticateToken, isOrganizer, (req, res) =>
   eventController.cancelEvent(req, res)
 );
+
+router.get('/:id/ticket-types', (req, res) =>
+  ticketTypeController.listForEvent(req, res)
+);
+
+router.post('/:id/ticket-types', authenticateToken, isOrganizer, (req, res) =>
+  ticketTypeController.create(req, res)
+);
+
+router.get('/:id/seats', (req, res) => seatController.listSeats(req, res));
 
 // Public routes
 router.get('/search', (req, res) => eventController.searchEvents(req, res));
