@@ -84,6 +84,34 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
     }
   };
 
+  const cancelBooking = async (bookingId: string) => {
+    const confirmed = window.confirm('Cancel this booking and request a refund?');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`http://localhost:5000/api/bookings/${bookingId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Unable to cancel booking');
+      }
+
+      await fetchMyBookings();
+      alert('Booking cancelled and refund processed successfully.');
+    } catch (error: any) {
+      alert(error.message || 'Unable to cancel booking.');
+    }
+  };
+
   useEffect(() => {
     const liveSocket = io('http://localhost:5000', {
       transports: ['websocket'],
@@ -185,6 +213,27 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
   const selectedTicket = ticketTypes.find((ticket) => ticket._id === selectedTicketTypeId);
   const seatTotal = selectedTicket ? selectedSeatIds.length * selectedTicket.price : 0;
 
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined') {
+        resolve(false);
+        return;
+      }
+
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve(Boolean((window as any).Razorpay));
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleCheckoutSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -215,54 +264,94 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
       }
 
       const order = paymentData.data?.order;
-      const verificationResponse = await fetch('http://localhost:5000/api/payments/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          orderId: order.orderId,
-          transactionId: order.transactionId,
-        }),
-      });
+      const keyId = paymentData.data?.keyId;
 
-      const verificationData = await verificationResponse.json();
-      if (!verificationResponse.ok || !verificationData.success) {
-        throw new Error(verificationData.message || 'Payment verification failed');
+      const confirmBooking = async (paymentId?: string, signature?: string) => {
+        const verificationResponse = await fetch('http://localhost:5000/api/payments/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            orderId: order.orderId,
+            paymentId,
+            transactionId: paymentId || order.transactionId,
+            signature,
+          }),
+        });
+
+        const verificationData = await verificationResponse.json();
+        if (!verificationResponse.ok || !verificationData.success) {
+          throw new Error(verificationData.message || 'Payment verification failed');
+        }
+
+        const bookingResponse = await fetch('http://localhost:5000/api/bookings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            eventId: selectedEvent._id,
+            ticketTypeId: selectedTicketTypeId,
+            seatIds: selectedSeatIds,
+            paymentMethod: bookingForm.paymentMethod,
+            paymentId: paymentId || undefined,
+            transactionId: paymentId || order.transactionId,
+          }),
+        });
+
+        const bookingData = await bookingResponse.json();
+        if (!bookingResponse.ok || !bookingData.success) {
+          throw new Error(bookingData.message || 'Booking failed');
+        }
+
+        const bookingReference = bookingData.data?.booking?.bookingReference || 'BK-UNKNOWN';
+        alert(
+          `Payment verified and booking confirmed for ${bookingForm.customerName || 'Guest'}! Reference: ${bookingReference}. Total: ₹${seatTotal}.`
+        );
+
+        await fetchMyBookings();
+        setCheckoutOpen(false);
+        setSelectedEvent(null);
+        setSelectedSeatIds([]);
+        setSelectedTicketTypeId('');
+        setTicketTypes([]);
+        setSeats([]);
+      };
+
+      if (order.gateway === 'razorpay' && keyId) {
+        const razorpayReady = await loadRazorpayScript();
+        if (!razorpayReady || typeof window === 'undefined' || !(window as any).Razorpay) {
+          await confirmBooking(order.transactionId, undefined);
+          return;
+        }
+
+        const razorpayInstance = new (window as any).Razorpay({
+          key: keyId,
+          amount: order.amount,
+          currency: order.currency,
+          name: 'Event Ticket Booking Platform',
+          description: `${selectedEvent.title} - ${selectedTicket.name}`,
+          order_id: order.orderId,
+          handler: async function (response: any) {
+            await confirmBooking(response.razorpay_payment_id, response.razorpay_signature);
+          },
+          prefill: {
+            name: bookingForm.customerName,
+            email: bookingForm.email,
+          },
+          theme: {
+            color: '#667eea',
+          },
+        });
+
+        razorpayInstance.open();
+        return;
       }
 
-      const bookingResponse = await fetch('http://localhost:5000/api/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          eventId: selectedEvent._id,
-          ticketTypeId: selectedTicketTypeId,
-          seatIds: selectedSeatIds,
-          paymentMethod: bookingForm.paymentMethod,
-        }),
-      });
-
-      const bookingData = await bookingResponse.json();
-      if (!bookingResponse.ok || !bookingData.success) {
-        throw new Error(bookingData.message || 'Booking failed');
-      }
-
-      const bookingReference = bookingData.data?.booking?.bookingReference || 'BK-UNKNOWN';
-      alert(
-        `Payment verified and booking confirmed for ${bookingForm.customerName || 'Guest'}! Reference: ${bookingReference}. Total: ₹${seatTotal}.`
-      );
-
-      await fetchMyBookings();
-      setCheckoutOpen(false);
-      setSelectedEvent(null);
-      setSelectedSeatIds([]);
-      setSelectedTicketTypeId('');
-      setTicketTypes([]);
-      setSeats([]);
+      await confirmBooking(order.transactionId, undefined);
     } catch (error: any) {
       alert(error.message || 'Unable to confirm booking. Please try again.');
     } finally {
@@ -339,10 +428,20 @@ export const EventsPage: React.FC<EventsProps> = ({ onLogout, user }) => {
                     <div>
                       <strong>{booking.eventId?.title || 'Event'}</strong>
                       <p>{booking.seatLabels?.join(', ') || 'Seat selection'}</p>
+                      <small className="booking-status">{booking.status || 'CONFIRMED'}</small>
                     </div>
                     <div className="booking-meta">
                       <span>{booking.bookingReference}</span>
                       <strong>₹{booking.totalAmount}</strong>
+                      {(booking.status || 'CONFIRMED') !== 'CANCELLED' && (
+                        <button
+                          type="button"
+                          className="cancel-booking-btn"
+                          onClick={() => cancelBooking(booking._id)}
+                        >
+                          Cancel
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

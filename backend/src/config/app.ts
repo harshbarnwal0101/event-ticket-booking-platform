@@ -31,6 +31,7 @@ export const createApp = (): {
   // Middleware
   app.use(helmet());
   app.use(cors(corsOptions));
+  app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
   app.use(cookieParser());
@@ -49,8 +50,12 @@ export const createApp = (): {
   };
 
   const redisClient = getRedisClient();
-  if (redisClient) {
-    ioOptions.adapter = createAdapter(redisClient as any, redisClient.duplicate() as any);
+  if (redisClient && (redisClient as any).isOpen) {
+    try {
+      ioOptions.adapter = createAdapter(redisClient as any, (redisClient as any).duplicate());
+    } catch (_error) {
+      ioOptions.adapter = undefined;
+    }
   }
 
   const io = new SocketIOServer(httpServer, ioOptions);
@@ -75,10 +80,11 @@ export const createApp = (): {
 
   // Health check endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
-    res.json({ 
-      status: 'ok', 
+    const redisStatus = redisClient && (redisClient as any).isOpen ? 'connected' : 'disconnected';
+    res.json({
+      status: 'ok',
       timestamp: new Date().toISOString(),
-      redis: redisClient ? 'connected' : 'disconnected'
+      redis: redisStatus,
     });
   });
 

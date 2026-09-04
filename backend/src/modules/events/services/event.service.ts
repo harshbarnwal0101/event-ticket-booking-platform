@@ -43,7 +43,10 @@ interface SearchEventsOptions {
 
 export class EventService {
   async createEvent(payload: CreateEventPayload): Promise<IEvent> {
-    // Verify venue exists
+    if (!Types.ObjectId.isValid(payload.venueId)) {
+      throw new Error('Please select a valid venue from the list.');
+    }
+
     const venue = await Venue.findById(payload.venueId);
     if (!venue) {
       throw new Error('Venue not found');

@@ -1,33 +1,81 @@
 .dashboard-page {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: radial-gradient(circle at top, rgba(239, 68, 68, 0.12), transparent 20%),
+    linear-gradient(180deg, #040b14 0%, #0b1320 100%);
+  color: #f8fafc;
 }
 
 .dashboard-header {
-  padding: 20px 0;
+  background: rgba(8, 11, 19, 0.9);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.dashboard-header .header-content {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 18px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: -0.05em;
+}
+
+.dashboard-header .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.dashboard-header .user-info {
+  color: #e2e8f0;
+  font-size: 0.95rem;
+}
+
+.dashboard-header .logout-btn {
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 0;
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
   color: #fff;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .dashboard-content {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 32px 20px 48px;
+  padding: 28px 22px 48px;
 }
 
-.create-event-btn {
-  padding: 12px 20px;
+.dashboard-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.create-event-btn,
+.secondary-action-btn {
+  padding: 12px 18px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
   color: #fff;
-  background: #667eea;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 10px 20px rgba(239, 68, 68, 0.22);
 }
 
-.create-event-btn:hover {
-  background: #5568d8;
+.secondary-action-btn {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: none;
 }
 
 .create-form-container,
@@ -35,16 +83,19 @@
 .analytics-section {
   margin-top: 24px;
   padding: 24px;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.2);
 }
 
 .create-form-container h2,
 .events-section h2,
 .analytics-section h2 {
-  margin: 0 0 20px;
-  color: #1f2937;
+  margin: 0 0 18px;
+  color: #fff;
+  font-size: 1.55rem;
+  letter-spacing: -0.04em;
 }
 
 .analytics-grid {
@@ -54,42 +105,44 @@
 }
 
 .analytics-card {
-  padding: 18px 16px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #f5f3ff 0%, #eef2ff 100%);
-  border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 18px 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.8), rgba(22, 33, 50, 0.85));
+  border: 1px solid rgba(248, 113, 113, 0.12);
 }
 
 .analytics-label {
-  font-size: 12px;
+  color: #fca5a5;
+  font-size: 0.7rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #667eea;
 }
 
 .analytics-card strong {
-  font-size: 28px;
-  line-height: 1.2;
-  color: #111827;
+  color: #fff;
+  font-size: 2rem;
+  line-height: 1.1;
 }
 
 .analytics-card small {
-  color: #475569;
-  font-size: 12px;
+  color: #cbd5e1;
+  font-size: 0.8rem;
 }
 
 .info-box {
   padding: 16px;
-  border-radius: 8px;
-  color: #5b4a1b;
-  background: #fff8df;
+  border-radius: 12px;
+  background: rgba(251, 191, 36, 0.08);
+  color: #fcd34d;
 }
 
-.event-form {
+.event-form,
+.venue-form,
+.ticket-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
@@ -97,31 +150,72 @@
 
 .event-form input,
 .event-form textarea,
-.event-form select {
+.event-form select,
+.venue-form input,
+.venue-form textarea,
+.venue-form select,
+.ticket-form input,
+.ticket-form textarea,
+.ticket-form select {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 7px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(2, 6, 23, 0.7);
+  color: #f8fafc;
 }
 
-.event-form textarea {
+.event-form textarea,
+.venue-form textarea,
+.ticket-form textarea {
   min-height: 92px;
   resize: vertical;
 }
 
 .event-form label {
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 600;
+  color: #dbe4f1;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .event-form label input {
   display: block;
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
-.event-form .create-event-btn {
+.venue-empty-state {
+  padding: 12px 14px;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  color: #cbd5e1;
+  font-size: 0.92rem;
+}
+
+.event-form .create-event-btn,
+.venue-form .create-event-btn,
+.ticket-form .create-event-btn {
   justify-self: start;
+}
+
+.ticket-form-container {
+  border: 1px solid rgba(248, 113, 113, 0.18);
+  background: linear-gradient(180deg, rgba(15,23,42,0.82), rgba(16,19,31,0.9));
+}
+
+.ticket-form textarea {
+  grid-column: span 2;
+}
+
+.error-banner {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  background: rgba(127, 29, 29, 0.2);
+  color: #fecaca;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .events-table-wrapper {
@@ -137,23 +231,24 @@
 .events-table th,
 .events-table td {
   padding: 14px 12px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   text-align: left;
   white-space: nowrap;
+  color: #e2e8f0;
 }
 
 .events-table th {
-  color: #6b7280;
-  font-size: 12px;
+  color: #cbd5e1;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 }
 
 .event-title {
   max-width: 240px;
   overflow: hidden;
-  color: #111827;
-  font-weight: 600;
+  color: #fff;
+  font-weight: 700;
   text-overflow: ellipsis;
 }
 
@@ -161,23 +256,23 @@
   display: inline-block;
   padding: 4px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 0.68rem;
   font-weight: 700;
 }
 
 .status-draft {
-  color: #92400e;
-  background: #fef3c7;
+  color: #fcd34d;
+  background: rgba(251, 191, 36, 0.14);
 }
 
 .status-published {
-  color: #166534;
-  background: #dcfce7;
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .status-cancelled {
-  color: #991b1b;
-  background: #fee2e2;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .actions {
@@ -186,41 +281,52 @@
 }
 
 .action-btn {
-  padding: 6px 10px;
+  padding: 7px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   color: #fff;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .publish-btn {
-  background: #16a34a;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
 }
 
 .cancel-btn {
-  background: #dc2626;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 
 .actions .view-btn {
   width: auto;
   margin: 0;
-  padding: 6px 10px;
-  background: #667eea;
+  padding: 7px 10px;
+  background: linear-gradient(135deg, #ec4899 0%, #f97316 100%);
 }
 
 @media (max-width: 768px) {
+  .dashboard-header .header-content {
+    flex-wrap: wrap;
+  }
+
   .dashboard-content {
     padding: 20px 12px 32px;
   }
 
   .create-form-container,
-  .events-section {
+  .events-section,
+  .analytics-section {
     padding: 16px;
   }
 
-  .event-form {
+  .event-form,
+  .ticket-form,
+  .venue-form {
     grid-template-columns: 1fr;
+  }
+
+  .ticket-form textarea {
+    grid-column: auto;
   }
 }

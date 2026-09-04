@@ -70,6 +70,34 @@ export class BookingController {
       });
     }
   }
+
+  async cancelBooking(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+          errorCode: 'NOT_AUTHENTICATED',
+        });
+        return;
+      }
+
+      const bookingId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const booking = await bookingService.cancelBooking(bookingId, req.user.userId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Booking cancelled successfully',
+        data: { booking },
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Failed to cancel booking',
+        errorCode: 'CANCEL_BOOKING_FAILED',
+      });
+    }
+  }
 }
 
 export default new BookingController();

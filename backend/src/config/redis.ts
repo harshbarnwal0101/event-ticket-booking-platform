@@ -5,17 +5,17 @@ let redisClient: RedisClientType | null = null;
 export const initializeRedis = async (): Promise<RedisClientType | null> => {
   try {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    
-    redisClient = createClient({ 
+
+    redisClient = createClient({
       url: redisUrl,
       socket: {
         reconnectStrategy: () => false // Don't retry on connection failure
       }
     });
 
-    redisClient.on('error', (_error) => {
-      // Silent fail in dev mode without Redis
-      return;
+    redisClient.on('error', () => {
+      console.warn('⚠️  Redis unavailable - running in development mode without Redis');
+      redisClient = null;
     });
 
     redisClient.on('connect', () => {
@@ -24,7 +24,8 @@ export const initializeRedis = async (): Promise<RedisClientType | null> => {
 
     await redisClient.connect();
     return redisClient;
-  } catch (error) {
+  } catch (_error) {
+    redisClient = null;
     console.warn('⚠️  Redis unavailable - running in development mode without Redis');
     console.warn('   (For full functionality with seat locking, please run Redis)');
     return null;

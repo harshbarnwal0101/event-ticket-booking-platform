@@ -14,7 +14,7 @@ export class PaymentController {
       }
 
       const { amount, paymentMethod } = req.body;
-      const order = paymentService.createOrder({
+      const order = await paymentService.createOrder({
         amount: Number(amount),
         paymentMethod,
       });
@@ -22,7 +22,7 @@ export class PaymentController {
       res.status(200).json({
         success: true,
         message: 'Payment order created successfully',
-        data: { order },
+        data: { order, keyId: order.keyId || process.env.RAZORPAY_KEY_ID || null },
       });
     } catch (error: any) {
       res.status(400).json({
@@ -44,8 +44,8 @@ export class PaymentController {
         return;
       }
 
-      const { orderId, transactionId } = req.body;
-      const result = paymentService.verifyPayment(orderId, transactionId);
+      const { orderId, paymentId, transactionId, signature } = req.body;
+      const result = await paymentService.verifyPayment(orderId, paymentId || transactionId, signature);
 
       res.status(200).json({
         success: true,
@@ -57,6 +57,63 @@ export class PaymentController {
         success: false,
         message: error.message || 'Payment verification failed',
         errorCode: 'VERIFY_PAYMENT_FAILED',
+      });
+    }
+  }
+
+  async handleWebhook(req: Request, res: Response): Promise<void> {
+    try {
+      const rawBody = req.body;
+      const signature = Array.isArray(req.headers['x-razorpay-signature'])
+        ? req.headers['x-razorpay-signature'][0]
+        : req.headers['x-razorpay-signature'];
+
+      const payload = Buffer.isBuffer(rawBody) ? rawBody : typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody || {});
+      const result = await paymentService.handleWebhook(payload, signature as string | undefined);
+
+      res.status(200).json({
+        success: true,
+        message: 'Webhook processed successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Webhook processing failed',
+        errorCode: 'WEBHOOK_FAILED',
+      });
+    }
+  }
+
+  async refundPayment(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+          errorCode: 'NOT_AUTHENTICATED',
+        });
+        return;
+      }
+
+      const { paymentId, amount, currency, notes } = req.body;
+      const result = await paymentService.refundPayment({
+        paymentId,
+        amount: Number(amount),
+        currency,
+        notes,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Refund processed successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Refund processing failed',
+        errorCode: 'REFUND_PAYMENT_FAILED',
       });
     }
   }

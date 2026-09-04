@@ -12,4 +12,8 @@ router.post('/', authenticateToken, isCustomer, (req, res) =>
   bookingController.createBooking(req, res)
 );
 
+router.post('/:id/cancel', authenticateToken, isCustomer, (req, res) =>
+  bookingController.cancelBooking(req, res)
+);
+
 export default router;

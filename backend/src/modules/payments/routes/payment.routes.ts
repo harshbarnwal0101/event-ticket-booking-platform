@@ -12,4 +12,12 @@ router.post('/verify', authenticateToken, (req, res) =>
   paymentController.verifyPayment(req, res)
 );
 
+router.post('/refund', authenticateToken, (req, res) =>
+  paymentController.refundPayment(req, res)
+);
+
+router.post('/webhook', (req, res) =>
+  paymentController.handleWebhook(req, res)
+);
+
 export default router;

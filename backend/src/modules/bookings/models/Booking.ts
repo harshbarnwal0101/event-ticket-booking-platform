@@ -24,6 +24,9 @@ export interface IBooking extends Document {
   unitPrice: number;
   totalAmount: number;
   paymentMethod: string;
+  paymentId?: string;
+  transactionId?: string;
+  refundId?: string;
   status: BookingStatus;
   paymentStatus: PaymentStatus;
   bookingReference: string;
@@ -82,6 +85,21 @@ const bookingSchema = new Schema<IBooking>(
       required: true,
       trim: true,
       default: 'UPI',
+    },
+    paymentId: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    transactionId: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    refundId: {
+      type: String,
+      trim: true,
+      default: null,
     },
     status: {
       type: String,

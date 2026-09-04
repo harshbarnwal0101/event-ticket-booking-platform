@@ -12,6 +12,15 @@ interface OrganizerEvent {
   ticketsSold: number;
 }
 
+interface VenueOption {
+  _id: string;
+  name: string;
+  city: string;
+  state?: string;
+  country?: string;
+  address?: string;
+}
+
 interface DashboardProps {
   onLogout: () => void;
   user: any;
@@ -19,9 +28,13 @@ interface DashboardProps {
 
 export const OrganizerDashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
   const [events, setEvents] = useState<OrganizerEvent[]>([]);
+  const [venues, setVenues] = useState<VenueOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showVenueForm, setShowVenueForm] = useState(false);
   const [formError, setFormError] = useState('');
+  const [venueError, setVenueError] = useState('');
+  const [ticketError, setTicketError] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -32,9 +45,43 @@ export const OrganizerDashboard: React.FC<DashboardProps> = ({ onLogout, user })
     totalCapacity: '1000',
     basePrice: '100',
   });
+  const [ticketFormData, setTicketFormData] = useState({
+    eventId: '',
+    name: '',
+    description: '',
+    price: '100',
+    quantity: '50',
+  });
+  const [venueFormData, setVenueFormData] = useState({
+    name: '',
+    description: '',
+    city: '',
+    state: '',
+    country: 'India',
+    zipCode: '',
+    address: '',
+    totalCapacity: '500',
+    amenities: 'Parking, Wi-Fi',
+    contactEmail: '',
+    contactPhone: '',
+  });
   useEffect(() => {
     fetchOrganizerEvents();
+    fetchVenues();
   }, []);
+
+  const fetchVenues = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/venues/search?limit=50');
+      const data = await response.json();
+      if (data.success) {
+        setVenues(data.data.venues || []);
+      }
+    } catch (err) {
+      console.error('Error fetching venues:', err);
+      setVenues([]);
+    }
+  };
 
   const fetchOrganizerEvents = async () => {
     try {
@@ -91,11 +138,79 @@ export const OrganizerDashboard: React.FC<DashboardProps> = ({ onLogout, user })
     setFormData((current) => ({ ...current, [field]: value }));
   };
 
+  const updateVenueForm = (field: string, value: string) => {
+    setVenueFormData((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateTicketForm = (field: string, value: string) => {
+    setTicketFormData((current) => ({ ...current, [field]: value }));
+  };
+
+  const createVenue = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setVenueError('');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/venues', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+        body: JSON.stringify({
+          ...venueFormData,
+          totalCapacity: Number(venueFormData.totalCapacity),
+          amenities: venueFormData.amenities
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean),
+        }),
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        setVenueError(data.message || 'Unable to create venue');
+        return;
+      }
+
+      setVenueFormData({
+        name: '',
+        description: '',
+        city: '',
+        state: '',
+        country: 'India',
+        zipCode: '',
+        address: '',
+        totalCapacity: '500',
+        amenities: 'Parking, Wi-Fi',
+        contactEmail: '',
+        contactPhone: '',
+      });
+      setShowVenueForm(false);
+      await fetchVenues();
+      if (data.data?.venue?._id) {
+        setFormData((current) => ({ ...current, venueId: data.data.venue._id }));
+      }
+    } catch {
+      setVenueError('Unable to create venue. Check that the backend is running.');
+    }
+  };
+
   const createEvent = async (event: React.FormEvent) => {
     event.preventDefault();
     setFormError('');
 
     try {
+      if (!formData.venueId || !/^[0-9a-fA-F]{24}$/.test(formData.venueId.trim())) {
+        setFormError('Please select a valid venue from the list before creating the event.');
+        return;
+      }
+
+      if (venues.length === 0) {
+        setFormError('No venues are available yet. Create a venue first, then create an event.');
+        return;
+      }
+
       const response = await fetch('http://localhost:5000/api/events', {
         method: 'POST',
         headers: {
@@ -104,6 +219,7 @@ export const OrganizerDashboard: React.FC<DashboardProps> = ({ onLogout, user })
         },
         body: JSON.stringify({
           ...formData,
+          venueId: formData.venueId.trim(),
           totalCapacity: Number(formData.totalCapacity),
           basePrice: Number(formData.basePrice),
         }),
@@ -128,6 +244,51 @@ export const OrganizerDashboard: React.FC<DashboardProps> = ({ onLogout, user })
       await fetchOrganizerEvents();
     } catch {
       setFormError('Unable to reach the backend. Check that it is running.');
+    }
+  };
+
+  const createTicketType = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setTicketError('');
+
+    try {
+      const eventId = ticketFormData.eventId || events[0]?._id;
+      if (!eventId) {
+        setTicketError('Create an event before adding ticket types.');
+        return;
+      }
+
+      const response = await fetch(`http://localhost:5000/api/events/${eventId}/ticket-types`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+        body: JSON.stringify({
+          name: ticketFormData.name,
+          description: ticketFormData.description,
+          price: Number(ticketFormData.price),
+          quantity: Number(ticketFormData.quantity),
+          isActive: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        setTicketError(data.message || 'Unable to create ticket type');
+        return;
+      }
+
+      setTicketFormData({
+        eventId: '',
+        name: '',
+        description: '',
+        price: '100',
+        quantity: '50',
+      });
+      await fetchOrganizerEvents();
+    } catch {
+      setTicketError('Unable to create ticket type. Check that the backend is running.');
     }
   };
 
@@ -167,13 +328,41 @@ export const OrganizerDashboard: React.FC<DashboardProps> = ({ onLogout, user })
 
       {/* Main Content */}
       <div className="dashboard-content">
-        {/* Create Event Button */}
-        <button
-          className="create-event-btn"
-          onClick={() => setShowCreateForm(!showCreateForm)}
-        >
-          {showCreateForm ? '✕ Cancel' : '+ Create New Event'}
-        </button>
+        <div className="dashboard-actions">
+          <button
+            className="create-event-btn"
+            onClick={() => setShowCreateForm(!showCreateForm)}
+          >
+            {showCreateForm ? '✕ Cancel' : '+ Create New Event'}
+          </button>
+          <button
+            className="secondary-action-btn"
+            onClick={() => setShowVenueForm(!showVenueForm)}
+          >
+            {showVenueForm ? '✕ Cancel Venue' : '+ Add Venue'}
+          </button>
+        </div>
+
+        {showVenueForm && (
+          <div className="create-form-container">
+            <h2>Create New Venue</h2>
+            {venueError && <div className="error-banner">{venueError}</div>}
+            <form className="venue-form" onSubmit={createVenue}>
+              <input placeholder="Venue name" value={venueFormData.name} onChange={(e) => updateVenueForm('name', e.target.value)} required />
+              <textarea placeholder="Description" value={venueFormData.description} onChange={(e) => updateVenueForm('description', e.target.value)} required />
+              <input placeholder="City" value={venueFormData.city} onChange={(e) => updateVenueForm('city', e.target.value)} required />
+              <input placeholder="State" value={venueFormData.state} onChange={(e) => updateVenueForm('state', e.target.value)} />
+              <input placeholder="Country" value={venueFormData.country} onChange={(e) => updateVenueForm('country', e.target.value)} required />
+              <input placeholder="ZIP code" value={venueFormData.zipCode} onChange={(e) => updateVenueForm('zipCode', e.target.value)} />
+              <input placeholder="Full address" value={venueFormData.address} onChange={(e) => updateVenueForm('address', e.target.value)} required />
+              <input type="number" min="1" placeholder="Venue capacity" value={venueFormData.totalCapacity} onChange={(e) => updateVenueForm('totalCapacity', e.target.value)} required />
+              <input placeholder="Amenities (comma separated)" value={venueFormData.amenities} onChange={(e) => updateVenueForm('amenities', e.target.value)} />
+              <input type="email" placeholder="Contact email" value={venueFormData.contactEmail} onChange={(e) => updateVenueForm('contactEmail', e.target.value)} />
+              <input placeholder="Contact phone" value={venueFormData.contactPhone} onChange={(e) => updateVenueForm('contactPhone', e.target.value)} />
+              <button className="create-event-btn" type="submit">Create Venue</button>
+            </form>
+          </div>
+        )}
 
         {/* Create Form */}
         {showCreateForm && (
@@ -183,7 +372,18 @@ export const OrganizerDashboard: React.FC<DashboardProps> = ({ onLogout, user })
             <form className="event-form" onSubmit={createEvent}>
               <input placeholder="Event title" value={formData.title} onChange={(e) => updateForm('title', e.target.value)} required />
               <textarea placeholder="Description" value={formData.description} onChange={(e) => updateForm('description', e.target.value)} required />
-              <input placeholder="Venue ID" value={formData.venueId} onChange={(e) => updateForm('venueId', e.target.value)} required />
+              {venues.length === 0 ? (
+                <div className="venue-empty-state">Create a venue before creating an event.</div>
+              ) : (
+                <select value={formData.venueId} onChange={(e) => updateForm('venueId', e.target.value)} required>
+                  <option value="">Select a venue</option>
+                  {venues.map((venue) => (
+                    <option key={venue._id} value={venue._id}>
+                      {venue.name} — {venue.city}{venue.state ? `, ${venue.state}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
               <select value={formData.category} onChange={(e) => updateForm('category', e.target.value)}>
                 {['CONCERT', 'CONFERENCE', 'SPORTS', 'THEATER', 'FESTIVAL', 'WORKSHOP', 'SEMINAR', 'EXHIBITION', 'OTHER'].map((category) => (
                   <option key={category} value={category}>{category}</option>
@@ -223,6 +423,26 @@ export const OrganizerDashboard: React.FC<DashboardProps> = ({ onLogout, user })
                 <small>{analytics.topCategory ? `Top category: ${analytics.topCategory[0]}` : 'No category data yet'}</small>
               </div>
             </div>
+          </div>
+        )}
+
+        {events.length > 0 && (
+          <div className="create-form-container ticket-form-container">
+            <h2>Add Ticket Type</h2>
+            {ticketError && <div className="error-banner">{ticketError}</div>}
+            <form className="ticket-form" onSubmit={createTicketType}>
+              <select value={ticketFormData.eventId} onChange={(e) => updateTicketForm('eventId', e.target.value)} required>
+                <option value="">Select an event</option>
+                {events.map((event) => (
+                  <option key={event._id} value={event._id}>{event.title}</option>
+                ))}
+              </select>
+              <input placeholder="Ticket name" value={ticketFormData.name} onChange={(e) => updateTicketForm('name', e.target.value)} required />
+              <textarea placeholder="Description" value={ticketFormData.description} onChange={(e) => updateTicketForm('description', e.target.value)} />
+              <input type="number" min="0" step="0.01" placeholder="Price" value={ticketFormData.price} onChange={(e) => updateTicketForm('price', e.target.value)} required />
+              <input type="number" min="1" placeholder="Quantity" value={ticketFormData.quantity} onChange={(e) => updateTicketForm('quantity', e.target.value)} required />
+              <button className="create-event-btn" type="submit">Create Ticket Type</button>
+            </form>
           </div>
         )}
 
@@ -275,7 +495,12 @@ export const OrganizerDashboard: React.FC<DashboardProps> = ({ onLogout, user })
                         {event.status === 'PUBLISHED' && (
                           <button className="action-btn cancel-btn" onClick={() => updateEventStatus(event._id, 'cancel')}>Cancel</button>
                         )}
-                        <button className="action-btn view-btn">View</button>
+                        <button
+                          className="action-btn view-btn"
+                          onClick={() => setTicketFormData((current) => ({ ...current, eventId: event._id }))}
+                        >
+                          Add Ticket
+                        </button>
                       </td>
                     </tr>
                   ))}

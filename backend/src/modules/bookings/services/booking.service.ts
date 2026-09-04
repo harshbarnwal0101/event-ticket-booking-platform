@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import Event, { EventStatus } from '../../events/models/Event';
 import Seat, { SeatStatus } from '../../seats/models/Seat';
 import TicketType from '../../tickets/models/TicketType';
+import paymentService from '../../payments/services/payment.service';
 import Booking, { BookingStatus, PaymentStatus } from '../models/Booking';
 
 interface CreateBookingPayload {
@@ -10,11 +11,13 @@ interface CreateBookingPayload {
   ticketTypeId: string;
   seatIds: string[];
   paymentMethod?: string;
+  paymentId?: string;
+  transactionId?: string;
 }
 
 export class BookingService {
   async createBooking(payload: CreateBookingPayload): Promise<any> {
-    const { userId, eventId, ticketTypeId, seatIds, paymentMethod = 'UPI' } = payload;
+    const { userId, eventId, ticketTypeId, seatIds, paymentMethod = 'UPI', paymentId, transactionId } = payload;
 
     if (!seatIds || seatIds.length === 0) {
       throw new Error('Please select at least one seat');
@@ -79,6 +82,8 @@ export class BookingService {
       unitPrice: ticketType.price,
       totalAmount,
       paymentMethod,
+      paymentId: paymentId || undefined,
+      transactionId: transactionId || undefined,
       status: BookingStatus.CONFIRMED,
       paymentStatus: PaymentStatus.PAID,
       bookingReference,
@@ -114,6 +119,74 @@ export class BookingService {
       seatLabels: booking.seatLabels,
       paymentMethod: booking.paymentMethod,
       createdAt: booking.createdAt,
+    };
+  }
+
+  async cancelBooking(bookingId: string, userId: string): Promise<any> {
+    const booking = await Booking.findOne({
+      _id: new Types.ObjectId(bookingId),
+      userId: new Types.ObjectId(userId),
+    }).populate('eventId').populate('ticketTypeId');
+
+    if (!booking) {
+      throw new Error('Booking not found');
+    }
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new Error('This booking has already been cancelled');
+    }
+
+    const event = await Event.findById(booking.eventId);
+    if (event) {
+      event.ticketsAvailable = Math.max(0, event.ticketsAvailable + booking.quantity);
+      event.ticketsSold = Math.max(0, event.ticketsSold - booking.quantity);
+      await event.save();
+    }
+
+    const ticketType = await TicketType.findById(booking.ticketTypeId);
+    if (ticketType) {
+      ticketType.availableQuantity = Math.max(0, ticketType.availableQuantity + booking.quantity);
+      await ticketType.save();
+    }
+
+    const refundTarget = booking.paymentId || booking.transactionId || booking.bookingReference;
+    if (booking.paymentStatus === PaymentStatus.PAID && refundTarget) {
+      const refundResponse = await paymentService.refundPayment({
+        paymentId: refundTarget,
+        amount: Math.round(booking.totalAmount * 100),
+        currency: 'INR',
+        notes: {
+          bookingReference: booking.bookingReference,
+          reason: 'customer_cancelled',
+        },
+      });
+
+      booking.refundId = refundResponse.refundId || booking.refundId || undefined;
+      booking.paymentStatus = refundResponse.success ? PaymentStatus.REFUNDED : PaymentStatus.PAID;
+    }
+
+    booking.status = BookingStatus.CANCELLED;
+    booking.paymentStatus = booking.paymentStatus === PaymentStatus.PAID ? PaymentStatus.REFUNDED : booking.paymentStatus;
+    await booking.save();
+
+    await Seat.updateMany(
+      { _id: { $in: booking.seatIds }, eventId: booking.eventId },
+      {
+        $set: {
+          status: SeatStatus.AVAILABLE,
+          ticketTypeId: null,
+          holdUntil: null,
+        },
+      }
+    );
+
+    return {
+      _id: booking._id,
+      bookingReference: booking.bookingReference,
+      status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      refundId: booking.refundId,
+      totalAmount: booking.totalAmount,
     };
   }
 

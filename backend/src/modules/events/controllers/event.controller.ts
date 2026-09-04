@@ -35,9 +35,13 @@ export class EventController {
         data: { event },
       });
     } catch (error: any) {
+      const message = error?.name === 'CastError' && error?.path === 'venueId'
+        ? 'Please select a valid venue from the list.'
+        : error.message || 'Failed to create event';
+
       res.status(400).json({
         success: false,
-        message: error.message || 'Failed to create event',
+        message,
         errorCode: 'CREATE_EVENT_FAILED',
       });
     }
